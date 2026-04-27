@@ -99,6 +99,7 @@
     /* ===== CONTENT ===== */
     .content {
       flex: 1;
+      min-height: 0;
       padding: 28px 24px;
       display: flex;
       flex-direction: column;
@@ -327,11 +328,32 @@
       position: relative;
       width: 100%;
       aspect-ratio: 16/9;
+      max-height: 38vh;
       background: #111;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
+    }
+    @media (orientation: landscape) {
+      .camera-view {
+        max-height: 45vh;
+      }
+      #screen-photo .content {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      #screen-photo .content > div:first-child {
+        width: 100%;
+      }
+      #screen-photo .photo-area {
+        flex: 1;
+        min-width: 0;
+      }
+      #screen-photo #btn-finish {
+        width: 100%;
+      }
     }
     .camera-view video, .camera-view img {
       width: 100%;
