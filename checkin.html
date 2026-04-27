@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>チェックイン</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --primary: #1a1a2e;
+      --accent: #4f8ef7;
+      --accent2: #7c5cbf;
+      --bg: #f5f6fa;
+      --card: #ffffff;
+      --text: #1a1a2e;
+      --sub: #6b7280;
+      --border: #e5e7eb;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --radius: 20px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.10);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ===== SCREENS ===== */
+    .screen {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .screen.active { display: flex; }
+
+    /* ===== HEADER ===== */
+    .header {
+      background: var(--primary);
+      color: white;
+      padding: 20px 24px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+    .header .room-badge {
+      background: rgba(255,255,255,0.18);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ===== PROGRESS BAR ===== */
+    .progress-bar {
+      height: 4px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.4s ease;
+    }
+
+    /* ===== CONTENT ===== */
+    .content {
+      flex: 1;
+      padding: 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    .screen-title {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: var(--text);
+    }
+    .screen-sub {
+      font-size: 15px;
+      color: var(--sub);
+      line-height: 1.6;
+    }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 18px 24px;
+      border-radius: var(--radius);
+      font-size: 17px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      -webkit-user-select: none;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.85; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      box-shadow: 0 4px 16px rgba(79,142,247,0.35);
+    }
+    .btn-secondary {
+      background: var(--card);
+      color: var(--text);
+      border: 2px solid var(--border);
+    }
+    .btn-danger {
+      background: white;
+      color: var(--danger);
+      border: 2px solid var(--danger);
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+    }
+
+    .btn-full { width: 100%; }
+
+    /* ===== LANGUAGE GRID ===== */
+    .lang-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .lang-btn {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      box-shadow: var(--shadow);
+    }
+    .lang-btn:active { transform: scale(0.96); }
+    .lang-btn.selected { border-color: var(--accent); background: #eef5ff; }
+    .lang-flag { font-size: 38px; }
+    .lang-name { font-size: 17px; font-weight: 700; }
+    .lang-sub { font-size: 13px; color: var(--sub); }
+
+    /* ===== COUNTER ===== */
+    .counter-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 20px;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .counter-btn {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: none;
+      font-size: 30px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .counter-btn:active { transform: scale(0.92); }
+    .counter-btn.minus { background: var(--border); color: var(--text); }
+    .counter-btn.plus  { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
+    .counter-num {
+      font-size: 72px;
+      font-weight: 900;
+      color: var(--text);
+      min-width: 80px;
+      text-align: center;
+      line-height: 1;
+    }
+    .counter-label { font-size: 15px; color: var(--sub); text-align: center; margin-top: 4px; }
+
+    /* ===== FORM ===== */
+    .form-section {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .form-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--sub);
+    }
+    .field label span.req { color: var(--danger); margin-left: 3px; }
+    .field input, .field select {
+      padding: 14px 16px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      font-size: 17px;
+      font-family: inherit;
+      color: var(--text);
+      background: #fafbfc;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: white;
+    }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 40px;
+    }
+
+    /* ===== RADIO ===== */
+    .radio-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .radio-option {
+      padding: 14px;
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      transition: all 0.15s;
+      background: var(--card);
+    }
+    .radio-option:active { transform: scale(0.96); }
+    .radio-option.selected {
+      border-color: var(--accent);
+      background: #eef5ff;
+      color: var(--accent);
+    }
+
+    /* ===== PERSON INDICATOR ===== */
+    .person-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      padding: 14px 18px;
+      border-radius: 14px;
+    }
+    .person-avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .person-info { flex: 1; }
+    .person-info .name { font-size: 16px; font-weight: 700; }
+    .person-info .total { font-size: 13px; opacity: 0.8; }
+
+    /* ===== PHOTO ===== */
+    .photo-area {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .camera-view {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .camera-view video, .camera-view img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .camera-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      color: white;
+    }
+    .camera-guide {
+      font-size: 48px;
+    }
+    .camera-guide-text {
+      font-size: 15px;
+      opacity: 0.85;
+      text-align: center;
+      padding: 0 20px;
+    }
+    .photo-controls {
+      padding: 16px;
+      display: flex;
+      gap: 12px;
+    }
+    #photoCanvas { display: none; }
+
+    /* ===== PASSPORT FRAME ===== */
+    .passport-frame {
+      position: absolute;
+      inset: 12px;
+      border: 3px dashed rgba(255,255,255,0.6);
+      border-radius: 12px;
+    }
+
+    /* ===== NOTICE ===== */
+    .notice {
+      background: #fff8e7;
+      border: 1.5px solid #fbbf24;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 14px;
+      color: #92400e;
+      line-height: 1.5;
+    }
+    .notice-icon { font-size: 18px; margin-right: 6px; }
+
+    /* ===== COMPLETION ===== */
+    .completion-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 32px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .completion-icon {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--success), #16a34a);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px;
+    }
+    .completion-title {
+      font-size: 26px;
+      font-weight: 800;
+    }
+    .info-card {
+      background: #f8faff;
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      width: 100%;
+      text-align: left;
+    }
+    .info-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 15px;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .icon { font-size: 20px; }
+    .info-row .label { font-size: 13px; color: var(--sub); }
+    .info-row .value { font-weight: 600; }
+
+    /* ===== WELCOME MSG ===== */
+    .welcome-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      font-size: 16px;
+      line-height: 1.8;
+      color: var(--text);
+      white-space: pre-line;
+    }
+
+    /* ===== STEP INDICATOR ===== */
+    .steps {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      padding: 4px 0;
+    }
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: all 0.2s;
+    }
+    .step-dot.active { background: var(--accent); width: 24px; border-radius: 4px; }
+    .step-dot.done { background: var(--success); }
+
+    /* ===== COPY BANNER ===== */
+    .copy-banner {
+      display: none;
+      background: #eef5ff;
+      border: 1.5px solid var(--accent);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 14px;
+      color: var(--accent);
+      align-items: center;
+      gap: 10px;
+    }
+    .copy-banner.show { display: flex; }
+    .copy-btn { font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== SCREEN 1: 言語選択 ===== -->
+  <div class="screen active" id="screen-lang">
+    <div class="header">
+      <h1>🏠 民泊チェックイン</h1>
+      <div class="room-badge" id="room-badge-lang">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:10%"></div></div>
+    <div class="content">
+      <div>
+        <div class="screen-title">言語を選択<br>Select Language</div>
+        <div class="screen-sub" style="margin-top:8px">ご希望の言語をタップしてください</div>
+      </div>
+      <div class="lang-grid">
+        <div class="lang-btn" onclick="selectLang('ja')">
+          <div class="lang-flag">🇯🇵</div>
+          <div class="lang-name">日本語</div>
+          <div class="lang-sub">Japanese</div>
+        </div>
+        <div class="lang-btn" onclick="selectLang('en')">
+          <div class="lang-flag">🇺🇸</div>
+          <div class="lang-name">English</div>
+          <div class="lang-sub">英語</div>
+        </div>
+        <div class="lang-btn" onclick="selectLang('zh-cn')">
+          <div class="lang-flag">🇨🇳</div>
+          <div class="lang-name">简体中文</div>
+          <div class="lang-sub">中国語（簡）</div>
+        </div>
+        <div class="lang-btn" onclick="selectLang('zh-tw')">
+          <div class="lang-flag">🇹🇼</div>
+          <div class="lang-name">繁體中文</div>
+          <div class="lang-sub">中国語（繁）</div>
+        </div>
+      </div>
+      <div class="lang-btn" style="flex-direction:row; justify-content:center;" onclick="selectLang('ko')">
+        <div class="lang-flag">🇰🇷</div>
+        <div class="lang-name">한국어</div>
+        <div class="lang-sub" style="margin-left:8px">韓国語</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 2: 案内文 ===== -->
+  <div class="screen" id="screen-welcome">
+    <div class="header">
+      <h1 id="hdr-welcome">ようこそ</h1>
+      <div class="room-badge" id="room-badge-welcome">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:25%"></div></div>
+    <div class="content">
+      <div class="screen-title" id="txt-welcome-title">ご宿泊のご案内</div>
+      <div class="welcome-card" id="txt-welcome-body">この度はご宿泊いただきありがとうございます。
+
+チェックインの手続きを行います。以下のご案内をご確認ください。
+
+🕐 チェックアウト：翌日11:00まで
+🚭 全室禁煙です
+🔇 22:00以降は静かにお過ごしください
+🗑️ ゴミはフロアのゴミ箱へ
+🔑 外出時はドアの施錠をお忘れなく
+
+次の画面から宿泊者情報の入力をお願いします。</div>
+      <button class="btn btn-primary btn-full" onclick="goTo('screen-count')">
+        <span id="txt-next1">次へ進む</span> →
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 3: 人数入力 ===== -->
+  <div class="screen" id="screen-count">
+    <div class="header">
+      <h1 id="hdr-count">宿泊人数</h1>
+      <div class="room-badge" id="room-badge-count">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:40%"></div></div>
+    <div class="content">
+      <div>
+        <div class="screen-title" id="txt-count-title">宿泊人数を教えてください</div>
+        <div class="screen-sub" id="txt-count-sub" style="margin-top:8px">今夜お泊りになる方全員の人数</div>
+      </div>
+      <div class="counter-wrap">
+        <button class="counter-btn minus" onclick="changeCount(-1)">−</button>
+        <div>
+          <div class="counter-num" id="count-display">1</div>
+          <div class="counter-label" id="txt-people">名</div>
+        </div>
+        <button class="counter-btn plus" onclick="changeCount(1)">＋</button>
+      </div>
+      <div class="notice">
+        <span class="notice-icon">ℹ️</span>
+        <span id="txt-count-note">宿泊者全員の情報をご入力いただきます。最後に全員での集合写真を撮影します。</span>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="startGuests()">
+        <span id="txt-next2">入力を開始する</span> →
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 4: 宿泊者情報入力 ===== -->
+  <div class="screen" id="screen-form">
+    <div class="header">
+      <h1 id="hdr-form">宿泊者情報</h1>
+      <div class="room-badge" id="room-badge-form">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="form-progress" style="width:55%"></div></div>
+    <div class="content">
+      <div class="person-indicator">
+        <div class="person-avatar" id="person-num">1</div>
+        <div class="person-info">
+          <div class="name" id="txt-person-label">1人目の情報</div>
+          <div class="total" id="txt-person-total">全1名中</div>
+        </div>
+      </div>
+
+      <!-- コピーバナー（2人目以降） -->
+      <div class="copy-banner" id="copy-banner">
+        <span>📋</span>
+        <span id="txt-copy-msg">前の方の情報をコピーしますか？</span>
+        <span class="copy-btn" id="txt-copy-btn" onclick="copyFromPrev()">コピーする</span>
+      </div>
+
+      <!-- 日本在住確認 -->
+      <div class="form-section" id="section-japan">
+        <div class="form-section-title" id="txt-japan-title">お住まいの確認</div>
+        <div class="field">
+          <label id="txt-japan-q">日本にお住まいですか？</label>
+          <div class="radio-group">
+            <div class="radio-option" id="opt-yes" onclick="setJapan(true)">
+              <div style="font-size:24px">🇯🇵</div>
+              <div id="txt-yes">はい</div>
+            </div>
+            <div class="radio-option" id="opt-no" onclick="setJapan(false)">
+              <div style="font-size:24px">🌍</div>
+              <div id="txt-no">いいえ</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 基本情報 -->
+      <div class="form-section" id="section-basic" style="display:none">
+        <div class="form-section-title" id="txt-basic-title">基本情報</div>
+        <div class="field">
+          <label id="lbl-name">氏名<span class="req">*</span></label>
+          <input type="text" id="f-name" placeholder="山田 太郎" autocomplete="off">
+        </div>
+        <div class="field">
+          <label id="lbl-addr">住所<span class="req">*</span></label>
+          <input type="text" id="f-addr" placeholder="東京都渋谷区..." autocomplete="off">
+        </div>
+        <div class="field">
+          <label id="lbl-phone">電話番号<span class="req">*</span></label>
+          <input type="tel" id="f-phone" placeholder="090-0000-0000" autocomplete="off">
+        </div>
+        <div class="field">
+          <label id="lbl-job">職業<span class="req">*</span></label>
+          <input type="text" id="f-job" placeholder="会社員" autocomplete="off">
+        </div>
+      </div>
+
+      <!-- 詳細情報 -->
+      <div class="form-section" id="section-detail" style="display:none">
+        <div class="form-section-title" id="txt-detail-title">詳細情報</div>
+        <div class="field">
+          <label id="lbl-gender">性別<span class="req">*</span></label>
+          <select id="f-gender">
+            <option value="">選択してください</option>
+            <option value="male" id="opt-male">男性</option>
+            <option value="female" id="opt-female">女性</option>
+            <option value="other" id="opt-other">その他</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="lbl-dob">生年月日<span class="req">*</span></label>
+          <input type="date" id="f-dob" max="">
+        </div>
+        <!-- 外国人のみ -->
+        <div id="section-foreign" style="display:none">
+          <div class="field" style="margin-top:12px">
+            <label id="lbl-nationality">国籍<span class="req">*</span></label>
+            <input type="text" id="f-nationality" placeholder="例: United States" autocomplete="off">
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label id="lbl-passport">旅券番号<span class="req">*</span></label>
+            <input type="text" id="f-passport" placeholder="例: AB1234567" autocomplete="off" style="text-transform:uppercase">
+          </div>
+        </div>
+      </div>
+
+      <!-- パスポート撮影（外国人のみ） -->
+      <div class="form-section" id="section-passport-photo" style="display:none">
+        <div class="form-section-title" id="txt-pp-title">パスポート撮影</div>
+        <div class="notice">
+          <span class="notice-icon">📷</span>
+          <span id="txt-pp-note">パスポートの顔写真ページを枠内に合わせて撮影してください</span>
+        </div>
+        <div class="photo-area" style="margin-top:12px">
+          <div class="camera-view" id="pp-camera-view">
+            <video id="pp-video" autoplay playsinline muted style="display:none; width:100%; height:100%; object-fit:cover;"></video>
+            <div class="camera-overlay" id="pp-overlay">
+              <div class="camera-guide">📗</div>
+              <div class="camera-guide-text" id="txt-pp-tap">「撮影する」をタップしてください</div>
+            </div>
+            <img id="pp-preview" style="display:none; width:100%; height:100%; object-fit:cover;">
+            <canvas id="pp-canvas" style="display:none"></canvas>
+            <div class="passport-frame"></div>
+          </div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px;">
+          <button class="btn btn-secondary" style="flex:1; font-size:14px" onclick="startPassportCamera()" id="btn-pp-capture">📷 撮影する</button>
+          <button class="btn btn-danger" style="flex:1; font-size:14px; display:none;" id="btn-pp-retake" onclick="retakePassport()">↩ 撮り直す</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-full" onclick="submitGuest()" id="btn-guest-next">
+        <span id="txt-guest-next">次の方へ →</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 5: 集合写真 ===== -->
+  <div class="screen" id="screen-photo">
+    <div class="header">
+      <h1 id="hdr-photo">集合写真</h1>
+      <div class="room-badge" id="room-badge-photo">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div>
+    <div class="content">
+      <div>
+        <div class="screen-title" id="txt-photo-title">全員で集合写真を撮影します</div>
+        <div class="screen-sub" id="txt-photo-sub" style="margin-top:8px">宿泊者全員がカメラに映るようにしてください</div>
+      </div>
+      <div class="photo-area">
+        <div class="camera-view" id="group-camera-view">
+          <video id="group-video" autoplay playsinline muted style="display:none; width:100%; height:100%; object-fit:cover; transform:scaleX(-1)"></video>
+          <img id="group-preview" style="display:none; width:100%; height:100%; object-fit:cover;">
+          <div class="camera-overlay" id="group-overlay">
+            <div class="camera-guide">📸</div>
+            <div class="camera-guide-text" id="txt-photo-tap">「カメラを起動」をタップしてください</div>
+          </div>
+          <canvas id="group-canvas" style="display:none"></canvas>
+        </div>
+        <div class="photo-controls">
+          <button class="btn btn-secondary" style="flex:1; font-size:14px;" id="btn-start-camera" onclick="startGroupCamera()">📷 カメラを起動</button>
+          <button class="btn btn-primary" style="flex:1; font-size:14px; display:none;" id="btn-take-photo" onclick="takeGroupPhoto()">✓ 撮影する</button>
+          <button class="btn btn-danger" style="flex:1; font-size:14px; display:none;" id="btn-retake-photo" onclick="retakeGroupPhoto()">↩ 撮り直す</button>
+        </div>
+      </div>
+      <button class="btn btn-success btn-full" id="btn-finish" onclick="finish()" style="display:none">
+        <span id="txt-finish">✓ チェックインを完了する</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 6: チェックイン完了 ===== -->
+  <div class="screen" id="screen-done">
+    <div class="header">
+      <h1 id="hdr-done">完了</h1>
+      <div class="room-badge" id="room-badge-done">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+    <div class="content" style="gap:20px;">
+      <div class="completion-card" style="width:100%">
+        <div class="completion-icon">✓</div>
+        <div class="completion-title" id="txt-done-title">チェックイン完了！</div>
+        <div class="screen-sub" id="txt-done-sub">ご滞在をお楽しみください</div>
+
+        <div class="info-card" style="text-align:left; width:100%">
+          <div class="info-row">
+            <span class="icon">📶</span>
+            <div>
+              <div class="label">Wi-Fi</div>
+              <div class="value" id="wifi-name">StayHome_101</div>
+            </div>
+          </div>
+          <div class="info-row">
+            <span class="icon">🔐</span>
+            <div>
+              <div class="label" id="lbl-wifi-pw">パスワード</div>
+              <div class="value">welcome2024</div>
+            </div>
+          </div>
+          <div class="info-row">
+            <span class="icon">🕐</span>
+            <div>
+              <div class="label" id="lbl-checkout">チェックアウト</div>
+              <div class="value" id="txt-checkout">翌日 11:00</div>
+            </div>
+          </div>
+          <div class="info-row">
+            <span class="icon">📞</span>
+            <div>
+              <div class="label" id="lbl-contact">緊急連絡先</div>
+              <div class="value">090-0000-0000</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- チェックアウトボタン -->
+      <button class="btn btn-full" id="btn-checkout-start" onclick="goTo('screen-checkout-confirm')"
+        style="background:#fff3f3; color:#ef4444; border:2px solid #ef4444; font-size:16px; padding:18px;">
+        <span id="txt-checkout-btn">🚪 チェックアウト</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 7: チェックアウト確認 ===== -->
+  <div class="screen" id="screen-checkout-confirm">
+    <div class="header">
+      <h1 id="hdr-checkout-confirm">チェックアウト</h1>
+      <div class="room-badge" id="room-badge-checkout">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:100%; background:linear-gradient(90deg,#ef4444,#f97316)"></div></div>
+    <div class="content" style="justify-content:center; gap:24px;">
+      <div class="completion-card" style="width:100%">
+        <div class="completion-icon" style="background:linear-gradient(135deg,#ef4444,#f97316)">🚪</div>
+        <div class="completion-title" id="txt-co-confirm-title">チェックアウトしますか？</div>
+        <div class="screen-sub" id="txt-co-confirm-sub" style="margin-top:4px">ご滞在ありがとうございました。<br>チェックアウトすると管理者に通知が送られます。</div>
+      </div>
+      <button class="btn btn-full" onclick="doCheckout()"
+        style="background:linear-gradient(135deg,#ef4444,#f97316); color:white; font-size:18px; padding:20px; box-shadow:0 4px 16px rgba(239,68,68,0.35)">
+        <span id="txt-co-confirm-btn">✓ チェックアウトする</span>
+      </button>
+      <button class="btn btn-secondary btn-full" onclick="goTo('screen-done')" style="font-size:16px">
+        <span id="txt-co-cancel">← 戻る</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SCREEN 8: チェックアウト完了 ===== -->
+  <div class="screen" id="screen-checkout-done">
+    <div class="header">
+      <h1 id="hdr-checkout-done">完了</h1>
+      <div class="room-badge" id="room-badge-checkout-done">101号室</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:100%; background:linear-gradient(90deg,#ef4444,#f97316)"></div></div>
+    <div class="content" style="justify-content:center; align-items:center; gap:24px;">
+      <div class="completion-card" style="width:100%">
+        <div class="completion-icon" style="background:linear-gradient(135deg,#f97316,#ef4444)">👋</div>
+        <div class="completion-title" id="txt-co-done-title">ありがとうございました！</div>
+        <div class="screen-sub" id="txt-co-done-sub" style="margin-top:4px">チェックアウトが完了しました。<br>またのご利用をお待ちしております。</div>
+        <div class="notice" style="width:100%; text-align:left; margin-top:8px">
+          <span class="notice-icon">📧</span>
+          <span id="txt-co-done-email">管理者にチェックアウト通知を送信しました。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== FIREBASE =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDVXp3E5D7LWNNW2shkf13fVeSmU-BwmsM",
+  authDomain: "beige-checkin.firebaseapp.com",
+  projectId: "beige-checkin",
+  storageBucket: "beige-checkin.firebasestorage.app",
+  messagingSenderId: "937457079326",
+  appId: "1:937457079326:web:c922c779005c1324ca4a0f"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// 画像を圧縮してbase64に変換
+function compressImage(dataUrl, maxWidth, quality) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, maxWidth / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
+// チェックインデータをFirestoreに保存
+async function saveCheckin() {
+  try {
+    showSaving(true);
+    const groupPhotoEl = document.getElementById('group-preview');
+    const groupPhotoCompressed = groupPhotoEl.src.startsWith('data:image')
+      ? await compressImage(groupPhotoEl.src, 640, 0.6)
+      : null;
+
+    const guestsData = await Promise.all(state.guests.map(async (g) => {
+      let passportPhoto = g.passportPhoto || null;
+      if (passportPhoto && passportPhoto.startsWith('data:image')) {
+        passportPhoto = await compressImage(passportPhoto, 500, 0.6);
+      }
+      return { ...g, passportPhoto };
+    }));
+
+    const checkinData = {
+      room: state.room,
+      checkinTime: firebase.firestore.FieldValue.serverTimestamp(),
+      checkoutTime: null,
+      status: 'checked-in',
+      totalGuests: state.totalGuests,
+      guests: guestsData,
+      groupPhoto: groupPhotoCompressed,
+      lang: state.lang,
+    };
+
+    const docRef = await db.collection('checkins').add(checkinData);
+    state.checkinDocId = docRef.id;
+    console.log('チェックイン保存完了:', docRef.id);
+  } catch (e) {
+    console.error('保存エラー:', e);
+  } finally {
+    showSaving(false);
+  }
+}
+
+// チェックアウトデータをFirestoreに更新
+async function saveCheckout() {
+  if (!state.checkinDocId) return;
+  try {
+    await db.collection('checkins').doc(state.checkinDocId).update({
+      checkoutTime: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'checked-out',
+    });
+    console.log('チェックアウト保存完了');
+  } catch (e) {
+    console.error('チェックアウト保存エラー:', e);
+  }
+}
+
+function showSaving(show) {
+  let el = document.getElementById('saving-overlay');
+  if (show && !el) {
+    el = document.createElement('div');
+    el.id = 'saving-overlay';
+    el.style.cssText = `
+      position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999;
+      display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px;
+    `;
+    el.innerHTML = `
+      <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+      <div style="color:white;font-size:16px;font-weight:600;">データを保存中...</div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    `;
+    document.body.appendChild(el);
+  } else if (!show && el) {
+    el.remove();
+  }
+}
+
+// ===== STATE =====
+let state = {
+  lang: 'ja',
+  room: '101号室',
+  totalGuests: 1,
+  currentGuest: 0,
+  guests: [],
+  isJapan: null,
+  passportCaptured: false,
+  groupPhotoCaptured: false,
+  groupStream: null,
+  ppStream: null,
+  resetTimer: null,
+  checkinTime: null,
+  checkinDocId: null,
+  passportPhotoData: null,
+};
+
+// ===== TRANSLATIONS =====
+const T = {
+  ja: {
+    welcome: 'ようこそ',
+    welcomeTitle: 'ご宿泊のご案内',
+    welcomeBody: 'この度はご宿泊いただきありがとうございます。\n\nチェックインの手続きを行います。以下のご案内をご確認ください。\n\n🕐 チェックアウト：翌日11:00まで\n🚭 全室禁煙です\n🔇 22:00以降は静かにお過ごしください\n🗑️ ゴミはフロアのゴミ箱へ\n🔑 外出時はドアの施錠をお忘れなく\n\n次の画面から宿泊者情報の入力をお願いします。',
+    next: '次へ進む',
+    countTitle: '宿泊人数を教えてください',
+    countSub: '今夜お泊りになる方全員の人数',
+    people: '名',
+    countNote: '宿泊者全員の情報をご入力いただきます。最後に全員での集合写真を撮影します。',
+    startInput: '入力を開始する',
+    personLabel: (n) => `${n}人目の情報`,
+    personTotal: (n, t) => `全${t}名中 ${n}人目`,
+    copyMsg: '前の方の情報をコピーしますか？',
+    copyBtn: 'コピーする',
+    japanTitle: 'お住まいの確認',
+    japanQ: '日本にお住まいですか？',
+    yes: 'はい（日本在住）',
+    no: 'いいえ（海外在住）',
+    basicTitle: '基本情報',
+    name: '氏名', addr: '住所', phone: '電話番号', job: '職業',
+    detailTitle: '詳細情報',
+    gender: '性別', dob: '生年月日',
+    male: '男性', female: '女性', other: 'その他',
+    nationality: '国籍', passport: '旅券番号',
+    ppTitle: 'パスポート撮影',
+    ppNote: 'パスポートの顔写真ページを枠内に合わせて撮影してください',
+    ppTap: 'タップして撮影する',
+    capture: '📷 撮影する', retake: '↩ 撮り直す',
+    guestNext: (n, t) => n < t ? `${n+1}人目へ →` : '集合写真へ →',
+    photoTitle: '全員で集合写真を撮影します',
+    photoSub: '宿泊者全員がカメラに映るようにしてください',
+    photoTap: '「カメラを起動」をタップしてください',
+    startCamera: '📷 カメラを起動',
+    takePhoto: '✓ 撮影する',
+    retakePhoto: '↩ 撮り直す',
+    finish: '✓ チェックインを完了する',
+    doneTitle: 'チェックイン完了！',
+    doneSub: 'ご滞在をお楽しみください',
+    wifiPw: 'パスワード', checkout: 'チェックアウト', contact: '緊急連絡先',
+    checkoutTime: '翌日 11:00',
+    checkoutBtn: '🚪 チェックアウト',
+    coConfirmTitle: 'チェックアウトしますか？',
+    coConfirmSub: 'ご滞在ありがとうございました。\nチェックアウトすると管理者に通知が送られます。',
+    coConfirmBtn: '✓ チェックアウトする',
+    coCancel: '← 戻る',
+    coDoneTitle: 'ありがとうございました！',
+    coDoneSub: 'チェックアウトが完了しました。\nまたのご利用をお待ちしております。',
+    coDoneEmail: '管理者にチェックアウト通知を送信しました。',
+    hdrCheckout: 'チェックアウト',
+    hdrForm: '宿泊者情報',
+    hdrPhoto: '集合写真',
+    hdrDone: '完了',
+    selectPls: '選択してください',
+    err_japan: '日本在住かどうかを選択してください',
+    err_name: '氏名を入力してください',
+    err_addr: '住所を入力してください',
+    err_phone: '電話番号を入力してください',
+    err_job: '職業を入力してください',
+    err_gender: '性別を選択してください',
+    err_dob: '生年月日を入力してください',
+    err_nationality: '国籍を入力してください',
+    err_passport: '旅券番号を入力してください',
+    err_pp: 'パスポートの写真を撮影してください',
+    err_photo: '集合写真を撮影してください',
+    namePh: '山田 太郎',
+    addrPh: '東京都渋谷区...',
+    phonePh: '090-0000-0000',
+    jobPh: '会社員',
+    nationalityPh: '例: United States',
+    passportPh: '例: AB1234567',
+  },
+  en: {
+    welcome: 'Welcome',
+    welcomeTitle: 'Welcome to Your Stay',
+    welcomeBody: 'Thank you for choosing to stay with us!\n\nPlease read the following information carefully.\n\n🕐 Check-out: by 11:00 AM next day\n🚭 No smoking anywhere in the building\n🔇 Please keep quiet after 10:00 PM\n🗑️ Please use the trash bins on the floor\n🔑 Please lock your door when going out\n\nPlease proceed to fill in your guest information.',
+    next: 'Next →',
+    countTitle: 'Number of Guests',
+    countSub: 'Total guests staying tonight',
+    people: 'guest(s)',
+    countNote: 'You will need to enter information for each guest. A group photo will be taken at the end.',
+    startInput: 'Start Check-in →',
+    personLabel: (n) => `Guest ${n}`,
+    personTotal: (n, t) => `${n} of ${t} guests`,
+    copyMsg: 'Copy information from previous guest?',
+    copyBtn: 'Copy',
+    japanTitle: 'Residence',
+    japanQ: 'Do you reside in Japan?',
+    yes: 'Yes (Japan resident)',
+    no: 'No (overseas)',
+    basicTitle: 'Basic Information',
+    name: 'Full Name', addr: 'Address', phone: 'Phone Number', job: 'Occupation',
+    detailTitle: 'Details',
+    gender: 'Gender', dob: 'Date of Birth',
+    male: 'Male', female: 'Female', other: 'Other',
+    nationality: 'Nationality', passport: 'Passport Number',
+    ppTitle: 'Passport Photo',
+    ppNote: 'Please align your passport photo page within the frame and take a photo.',
+    ppTap: 'Tap to take photo',
+    capture: '📷 Take Photo', retake: '↩ Retake',
+    guestNext: (n, t) => n < t ? `Next Guest (${n+1}/${t}) →` : 'Group Photo →',
+    photoTitle: 'Group Photo',
+    photoSub: 'Please make sure all guests are visible in the frame.',
+    photoTap: 'Tap "Start Camera" to begin',
+    startCamera: '📷 Start Camera',
+    takePhoto: '✓ Take Photo',
+    retakePhoto: '↩ Retake',
+    finish: '✓ Complete Check-in',
+    doneTitle: 'Check-in Complete!',
+    doneSub: 'Enjoy your stay!',
+    wifiPw: 'Password', checkout: 'Check-out', contact: 'Emergency Contact',
+    checkoutTime: 'Next day 11:00 AM',
+    checkoutBtn: '🚪 Check Out',
+    coConfirmTitle: 'Ready to check out?',
+    coConfirmSub: 'Thank you for staying with us.\nThe host will be notified when you check out.',
+    coConfirmBtn: '✓ Check Out',
+    coCancel: '← Back',
+    coDoneTitle: 'Thank you!',
+    coDoneSub: 'Check-out complete.\nWe hope to see you again!',
+    coDoneEmail: 'The host has been notified of your check-out.',
+    hdrCheckout: 'Check Out',
+    hdrForm: 'Guest Info',
+    hdrPhoto: 'Group Photo',
+    hdrDone: 'Complete',
+    selectPls: 'Please select',
+    err_japan: 'Please select whether you reside in Japan',
+    err_name: 'Please enter your full name',
+    err_addr: 'Please enter your address',
+    err_phone: 'Please enter your phone number',
+    err_job: 'Please enter your occupation',
+    err_gender: 'Please select your gender',
+    err_dob: 'Please enter your date of birth',
+    err_nationality: 'Please enter your nationality',
+    err_passport: 'Please enter your passport number',
+    err_pp: 'Please take a photo of your passport',
+    err_photo: 'Please take a group photo',
+    namePh: 'Taro Yamada',
+    addrPh: 'Tokyo, Shibuya...',
+    phonePh: '+81-90-0000-0000',
+    jobPh: 'Office Worker',
+    nationalityPh: 'e.g. United States',
+    passportPh: 'e.g. AB1234567',
+  },
+  'zh-cn': {
+    welcome: '欢迎',
+    welcomeTitle: '入住须知',
+    welcomeBody: '感谢您的入住！\n\n请仔细阅读以下信息。\n\n🕐 退房时间：次日11:00前\n🚭 全楼禁烟\n🔇 22:00以后请保持安静\n🗑️ 请使用楼层垃圾桶\n🔑 外出时请锁门\n\n请继续填写住客信息。',
+    next: '下一步 →',
+    countTitle: '入住人数',
+    countSub: '今晚入住的所有人数',
+    people: '人',
+    countNote: '需要填写每位住客的信息，最后需要拍摄全体住客合影。',
+    startInput: '开始办理 →',
+    personLabel: (n) => `第${n}位住客`,
+    personTotal: (n, t) => `共${t}位，第${n}位`,
+    copyMsg: '是否复制上一位住客的信息？',
+    copyBtn: '复制',
+    japanTitle: '居住地确认',
+    japanQ: '您是否居住在日本？',
+    yes: '是（日本居民）',
+    no: '否（海外居民）',
+    basicTitle: '基本信息',
+    name: '姓名', addr: '地址', phone: '电话号码', job: '职业',
+    detailTitle: '详细信息',
+    gender: '性别', dob: '出生日期',
+    male: '男', female: '女', other: '其他',
+    nationality: '国籍', passport: '护照号码',
+    ppTitle: '护照拍照',
+    ppNote: '请将护照照片页对准框内拍照。',
+    ppTap: '点击拍照',
+    capture: '📷 拍照', retake: '↩ 重拍',
+    guestNext: (n, t) => n < t ? `下一位 (${n+1}/${t}) →` : '合影拍摄 →',
+    photoTitle: '集体合影',
+    photoSub: '请确保所有住客都出现在镜头中。',
+    photoTap: '点击"启动摄像头"开始',
+    startCamera: '📷 启动摄像头',
+    takePhoto: '✓ 拍照',
+    retakePhoto: '↩ 重拍',
+    finish: '✓ 完成入住',
+    doneTitle: '入住完成！',
+    doneSub: '祝您入住愉快！',
+    wifiPw: '密码', checkout: '退房时间', contact: '紧急联系',
+    checkoutTime: '次日 11:00',
+    checkoutBtn: '🚪 退房',
+    coConfirmTitle: '确认退房？',
+    coConfirmSub: '感谢您的入住。\n退房后将通知房东。',
+    coConfirmBtn: '✓ 确认退房',
+    coCancel: '← 返回',
+    coDoneTitle: '感谢您的入住！',
+    coDoneSub: '退房完成。\n期待再次为您服务！',
+    coDoneEmail: '已向房东发送退房通知。',
+    hdrCheckout: '退房',
+    hdrForm: '住客信息',
+    hdrPhoto: '集体合影',
+    hdrDone: '完成',
+    selectPls: '请选择',
+    err_japan: '请选择是否居住在日本',
+    err_name: '请输入姓名', err_addr: '请输入地址',
+    err_phone: '请输入电话号码', err_job: '请输入职业',
+    err_gender: '请选择性别', err_dob: '请输入出生日期',
+    err_nationality: '请输入国籍', err_passport: '请输入护照号码',
+    err_pp: '请拍摄护照照片', err_photo: '请拍摄合影',
+    namePh: '山田太郎',addrPh: '东京都涩谷区...',phonePh: '+81-90-0000-0000',
+    jobPh: '上班族',nationalityPh: '例：United States',passportPh: '例：AB1234567',
+  },
+  'zh-tw': {
+    welcome: '歡迎',
+    welcomeTitle: '入住須知',
+    welcomeBody: '感謝您的入住！\n\n請仔細閱讀以下資訊。\n\n🕐 退房時間：次日11:00前\n🚭 全棟禁菸\n🔇 22:00後請保持安靜\n🗑️ 請使用樓層垃圾桶\n🔑 外出時請鎖門\n\n請繼續填寫住客資訊。',
+    next: '下一步 →',
+    countTitle: '入住人數',
+    countSub: '今晚入住的所有人數',
+    people: '人',
+    countNote: '需要填寫每位住客的資訊，最後需要拍攝全體住客合照。',
+    startInput: '開始辦理 →',
+    personLabel: (n) => `第${n}位住客`,
+    personTotal: (n, t) => `共${t}位，第${n}位`,
+    copyMsg: '是否複製上一位住客的資訊？',
+    copyBtn: '複製',
+    japanTitle: '居住地確認',
+    japanQ: '您是否居住在日本？',
+    yes: '是（日本居民）',
+    no: '否（海外居民）',
+    basicTitle: '基本資訊',
+    name: '姓名', addr: '地址', phone: '電話號碼', job: '職業',
+    detailTitle: '詳細資訊',
+    gender: '性別', dob: '出生日期',
+    male: '男', female: '女', other: '其他',
+    nationality: '國籍', passport: '護照號碼',
+    ppTitle: '護照拍照',
+    ppNote: '請將護照照片頁對準框內拍照。',
+    ppTap: '點擊拍照',
+    capture: '📷 拍照', retake: '↩ 重拍',
+    guestNext: (n, t) => n < t ? `下一位 (${n+1}/${t}) →` : '合照拍攝 →',
+    photoTitle: '集體合照',
+    photoSub: '請確保所有住客都出現在鏡頭中。',
+    photoTap: '點擊「啟動攝影機」開始',
+    startCamera: '📷 啟動攝影機',
+    takePhoto: '✓ 拍照',
+    retakePhoto: '↩ 重拍',
+    finish: '✓ 完成入住',
+    doneTitle: '入住完成！',
+    doneSub: '祝您入住愉快！',
+    wifiPw: '密碼', checkout: '退房時間', contact: '緊急聯絡',
+    checkoutTime: '次日 11:00',
+    checkoutBtn: '🚪 退房',
+    coConfirmTitle: '確認退房？',
+    coConfirmSub: '感謝您的入住。\n退房後將通知房東。',
+    coConfirmBtn: '✓ 確認退房',
+    coCancel: '← 返回',
+    coDoneTitle: '感謝您的入住！',
+    coDoneSub: '退房完成。\n期待再次為您服務！',
+    coDoneEmail: '已向房東發送退房通知。',
+    hdrCheckout: '退房',
+    hdrForm: '住客資訊',
+    hdrPhoto: '集體合照',
+    hdrDone: '完成',
+    selectPls: '請選擇',
+    err_japan: '請選擇是否居住在日本',
+    err_name: '請輸入姓名', err_addr: '請輸入地址',
+    err_phone: '請輸入電話號碼', err_job: '請輸入職業',
+    err_gender: '請選擇性別', err_dob: '請輸入出生日期',
+    err_nationality: '請輸入國籍', err_passport: '請輸入護照號碼',
+    err_pp: '請拍攝護照照片', err_photo: '請拍攝合照',
+    namePh: '山田太郎',addrPh: '東京都澀谷區...',phonePh: '+81-90-0000-0000',
+    jobPh: '上班族',nationalityPh: '例：United States',passportPh: '例：AB1234567',
+  },
+  ko: {
+    welcome: '환영합니다',
+    welcomeTitle: '숙박 안내',
+    welcomeBody: '저희 숙소를 이용해 주셔서 감사합니다!\n\n다음 안내 사항을 확인해 주세요.\n\n🕐 체크아웃: 다음날 11:00까지\n🚭 전 객실 금연\n🔇 22:00 이후 조용히 해주세요\n🗑️ 쓰레기는 층 쓰레기통을 이용해 주세요\n🔑 외출 시 잠금을 확인해 주세요\n\n다음 화면에서 숙박자 정보를 입력해 주세요.',
+    next: '다음 →',
+    countTitle: '숙박 인원',
+    countSub: '오늘 밤 숙박하는 전체 인원',
+    people: '명',
+    countNote: '모든 숙박자의 정보를 입력해 주세요. 마지막에 단체 사진을 촬영합니다.',
+    startInput: '입력 시작 →',
+    personLabel: (n) => `${n}번째 숙박자`,
+    personTotal: (n, t) => `전체 ${t}명 중 ${n}번째`,
+    copyMsg: '이전 숙박자의 정보를 복사할까요?',
+    copyBtn: '복사하기',
+    japanTitle: '거주지 확인',
+    japanQ: '일본에 거주하고 계십니까?',
+    yes: '예 (일본 거주)',
+    no: '아니오 (해외 거주)',
+    basicTitle: '기본 정보',
+    name: '성명', addr: '주소', phone: '전화번호', job: '직업',
+    detailTitle: '상세 정보',
+    gender: '성별', dob: '생년월일',
+    male: '남성', female: '여성', other: '기타',
+    nationality: '국적', passport: '여권 번호',
+    ppTitle: '여권 촬영',
+    ppNote: '여권 사진이 있는 페이지를 틀 안에 맞춰 촬영해 주세요.',
+    ppTap: '탭하여 촬영',
+    capture: '📷 촬영', retake: '↩ 다시 찍기',
+    guestNext: (n, t) => n < t ? `다음 숙박자 (${n+1}/${t}) →` : '단체 사진 →',
+    photoTitle: '단체 사진 촬영',
+    photoSub: '모든 숙박자가 카메라에 나오도록 해주세요.',
+    photoTap: '"카메라 시작"을 탭해주세요',
+    startCamera: '📷 카메라 시작',
+    takePhoto: '✓ 촬영',
+    retakePhoto: '↩ 다시 찍기',
+    finish: '✓ 체크인 완료',
+    doneTitle: '체크인 완료!',
+    doneSub: '즐거운 여행 되세요!',
+    wifiPw: '비밀번호', checkout: '체크아웃', contact: '긴급 연락처',
+    checkoutTime: '다음날 11:00',
+    checkoutBtn: '🚪 체크아웃',
+    coConfirmTitle: '체크아웃 하시겠습니까?',
+    coConfirmSub: '이용해 주셔서 감사합니다.\n체크아웃 시 호스트에게 알림이 전송됩니다.',
+    coConfirmBtn: '✓ 체크아웃',
+    coCancel: '← 돌아가기',
+    coDoneTitle: '감사합니다!',
+    coDoneSub: '체크아웃이 완료되었습니다.\n또 방문해 주세요!',
+    coDoneEmail: '호스트에게 체크아웃 알림을 보냈습니다.',
+    hdrCheckout: '체크아웃',
+    hdrForm: '숙박자 정보',
+    hdrPhoto: '단체 사진',
+    hdrDone: '완료',
+    selectPls: '선택해 주세요',
+    err_japan: '일본 거주 여부를 선택해 주세요',
+    err_name: '성명을 입력해 주세요', err_addr: '주소를 입력해 주세요',
+    err_phone: '전화번호를 입력해 주세요', err_job: '직업을 입력해 주세요',
+    err_gender: '성별을 선택해 주세요', err_dob: '생년월일을 입력해 주세요',
+    err_nationality: '국적을 입력해 주세요', err_passport: '여권 번호를 입력해 주세요',
+    err_pp: '여권 사진을 촬영해 주세요', err_photo: '단체 사진을 촬영해 주세요',
+    namePh: '야마다 타로',addrPh: '도쿄도 시부야구...',phonePh: '+81-90-0000-0000',
+    jobPh: '회사원',nationalityPh: '예: United States',passportPh: '예: AB1234567',
+  }
+};
+
+function t(key, ...args) {
+  const lang = T[state.lang] || T.ja;
+  const val = lang[key];
+  return typeof val === 'function' ? val(...args) : (val || key);
+}
+
+// ===== NAVIGATION =====
+function goTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screenId).classList.add('active');
+  document.getElementById(screenId).scrollTop = 0;
+}
+
+// ===== LANG =====
+function selectLang(lang) {
+  state.lang = lang;
+  applyLang();
+  goTo('screen-welcome');
+}
+
+function applyLang() {
+  const l = state.lang;
+  const room = state.room;
+
+  // headers
+  ['lang','welcome','count','form','photo','done'].forEach(s => {
+    const el = document.getElementById(`room-badge-${s}`);
+    if (el) el.textContent = room;
+  });
+
+  document.getElementById('hdr-welcome').textContent = t('welcome');
+  document.getElementById('txt-welcome-title').textContent = t('welcomeTitle');
+  document.getElementById('txt-welcome-body').textContent = t('welcomeBody');
+  document.getElementById('txt-next1').textContent = t('next');
+
+  document.getElementById('txt-count-title').textContent = t('countTitle');
+  document.getElementById('txt-count-sub').textContent = t('countSub');
+  document.getElementById('txt-people').textContent = t('people');
+  document.getElementById('txt-count-note').textContent = t('countNote');
+  document.getElementById('txt-next2').textContent = t('startInput');
+
+  document.getElementById('hdr-form').textContent = t('hdrForm');
+  document.getElementById('txt-japan-title').textContent = t('japanTitle');
+  document.getElementById('txt-japan-q').textContent = t('japanQ');
+  document.getElementById('txt-yes').textContent = t('yes');
+  document.getElementById('txt-no').textContent = t('no');
+  document.getElementById('txt-basic-title').textContent = t('basicTitle');
+  document.getElementById('lbl-name').innerHTML = t('name') + '<span class="req">*</span>';
+  document.getElementById('lbl-addr').innerHTML = t('addr') + '<span class="req">*</span>';
+  document.getElementById('lbl-phone').innerHTML = t('phone') + '<span class="req">*</span>';
+  document.getElementById('lbl-job').innerHTML = t('job') + '<span class="req">*</span>';
+  document.getElementById('txt-detail-title').textContent = t('detailTitle');
+  document.getElementById('lbl-gender').innerHTML = t('gender') + '<span class="req">*</span>';
+  document.getElementById('lbl-dob').innerHTML = t('dob') + '<span class="req">*</span>';
+  document.getElementById('opt-male').textContent = t('male');
+  document.getElementById('opt-female').textContent = t('female');
+  document.getElementById('opt-other').textContent = t('other');
+  document.getElementById('lbl-nationality').innerHTML = t('nationality') + '<span class="req">*</span>';
+  document.getElementById('lbl-passport').innerHTML = t('passport') + '<span class="req">*</span>';
+  document.getElementById('txt-pp-title').textContent = t('ppTitle');
+  document.getElementById('txt-pp-note').textContent = t('ppNote');
+  document.getElementById('txt-pp-tap').textContent = t('ppTap');
+  document.getElementById('btn-pp-capture').textContent = t('capture');
+  document.getElementById('btn-pp-retake').textContent = t('retake');
+
+  document.getElementById('hdr-photo').textContent = t('hdrPhoto');
+  document.getElementById('txt-photo-title').textContent = t('photoTitle');
+  document.getElementById('txt-photo-sub').textContent = t('photoSub');
+  document.getElementById('txt-photo-tap').textContent = t('photoTap');
+  document.getElementById('btn-start-camera').textContent = t('startCamera');
+  document.getElementById('btn-take-photo').textContent = t('takePhoto');
+  document.getElementById('btn-retake-photo').textContent = t('retakePhoto');
+  document.getElementById('txt-finish').textContent = t('finish');
+
+  document.getElementById('hdr-done').textContent = t('hdrDone');
+  document.getElementById('txt-done-title').textContent = t('doneTitle');
+  document.getElementById('txt-done-sub').textContent = t('doneSub');
+  document.getElementById('lbl-wifi-pw').textContent = t('wifiPw');
+  document.getElementById('lbl-checkout').textContent = t('checkout');
+  document.getElementById('txt-checkout').textContent = t('checkoutTime');
+  document.getElementById('lbl-contact').textContent = t('contact');
+  document.getElementById('txt-checkout-btn').textContent = t('checkoutBtn');
+
+  document.getElementById('hdr-checkout-confirm').textContent = t('hdrCheckout');
+  document.getElementById('room-badge-checkout').textContent = room;
+  document.getElementById('txt-co-confirm-title').textContent = t('coConfirmTitle');
+  document.getElementById('txt-co-confirm-sub').textContent = t('coConfirmSub');
+  document.getElementById('txt-co-confirm-btn').textContent = t('coConfirmBtn');
+  document.getElementById('txt-co-cancel').textContent = t('coCancel');
+
+  document.getElementById('hdr-checkout-done').textContent = t('hdrDone');
+  document.getElementById('room-badge-checkout-done').textContent = room;
+  document.getElementById('txt-co-done-title').textContent = t('coDoneTitle');
+  document.getElementById('txt-co-done-sub').textContent = t('coDoneSub');
+  document.getElementById('txt-co-done-email').textContent = t('coDoneEmail');
+
+  // placeholders
+  document.getElementById('f-name').placeholder = t('namePh');
+  document.getElementById('f-addr').placeholder = t('addrPh');
+  document.getElementById('f-phone').placeholder = t('phonePh');
+  document.getElementById('f-job').placeholder = t('jobPh');
+  document.getElementById('f-nationality').placeholder = t('nationalityPh');
+  document.getElementById('f-passport').placeholder = t('passportPh');
+  document.getElementById('f-gender').options[0].text = t('selectPls');
+}
+
+// ===== COUNT =====
+function changeCount(delta) {
+  state.totalGuests = Math.max(1, Math.min(10, state.totalGuests + delta));
+  document.getElementById('count-display').textContent = state.totalGuests;
+}
+
+// ===== GUESTS =====
+function startGuests() {
+  state.guests = [];
+  state.currentGuest = 1;
+  loadGuestForm();
+  goTo('screen-form');
+}
+
+function loadGuestForm() {
+  const n = state.currentGuest;
+  const total = state.totalGuests;
+
+  document.getElementById('person-num').textContent = n;
+  document.getElementById('txt-person-label').textContent = t('personLabel', n);
+  document.getElementById('txt-person-total').textContent = t('personTotal', n, total);
+
+  // コピーバナー
+  const banner = document.getElementById('copy-banner');
+  if (n > 1 && state.guests.length > 0) {
+    banner.classList.add('show');
+    document.getElementById('txt-copy-msg').textContent = t('copyMsg');
+    document.getElementById('txt-copy-btn').textContent = t('copyBtn');
+  } else {
+    banner.classList.remove('show');
+  }
+
+  // フォームリセット
+  ['f-name','f-addr','f-phone','f-job','f-nationality','f-passport'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-gender').value = '';
+  document.getElementById('f-dob').value = '';
+  state.isJapan = null;
+  state.passportCaptured = false;
+
+  // セクション非表示
+  document.getElementById('section-basic').style.display = 'none';
+  document.getElementById('section-detail').style.display = 'none';
+  document.getElementById('section-foreign').style.display = 'none';
+  document.getElementById('section-passport-photo').style.display = 'none';
+  document.getElementById('opt-yes').classList.remove('selected');
+  document.getElementById('opt-no').classList.remove('selected');
+
+  // パスポートプレビューリセット
+  document.getElementById('pp-preview').style.display = 'none';
+  document.getElementById('pp-preview').src = '';
+  document.getElementById('pp-overlay').style.display = 'flex';
+  document.getElementById('btn-pp-retake').style.display = 'none';
+
+  // ボタンテキスト更新
+  const isLast = n === total;
+  document.getElementById('txt-guest-next').textContent = t('guestNext', n, total);
+
+  // progress
+  const pct = 55 + (n / total) * 20;
+  document.getElementById('form-progress').style.width = pct + '%';
+}
+
+function setJapan(isJapan) {
+  state.isJapan = isJapan;
+  document.getElementById('opt-yes').classList.toggle('selected', isJapan);
+  document.getElementById('opt-no').classList.toggle('selected', !isJapan);
+
+  document.getElementById('section-basic').style.display = 'flex';
+  document.getElementById('section-detail').style.display = 'flex';
+  document.getElementById('section-foreign').style.display = isJapan ? 'none' : 'block';
+  document.getElementById('section-passport-photo').style.display = isJapan ? 'none' : 'flex';
+}
+
+function copyFromPrev() {
+  if (state.guests.length === 0) return;
+  const prev = state.guests[state.guests.length - 1];
+  document.getElementById('f-name').value = prev.name || '';
+  document.getElementById('f-addr').value = prev.addr || '';
+  document.getElementById('f-phone').value = prev.phone || '';
+  document.getElementById('f-job').value = prev.job || '';
+  document.getElementById('f-gender').value = prev.gender || '';
+  document.getElementById('f-dob').value = prev.dob || '';
+  if (prev.isJapan !== null) setJapan(prev.isJapan);
+}
+
+// ===== PASSPORT CAMERA =====
+async function startPassportCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+      audio: false
+    });
+    state.ppStream = stream;
+    const video = document.getElementById('pp-video');
+    video.srcObject = stream;
+    video.style.display = 'block';
+    document.getElementById('pp-overlay').style.display = 'none';
+    // ボタンを「今すぐ撮影」に変更
+    document.getElementById('btn-pp-capture').textContent = '✓ 今すぐ撮影';
+    document.getElementById('btn-pp-capture').onclick = snapPassport;
+  } catch (e) {
+    showAlert('カメラにアクセスできませんでした。HTTPSで開いているか確認してください。');
+  }
+}
+
+function snapPassport() {
+  const video = document.getElementById('pp-video');
+  const canvas = document.getElementById('pp-canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+  // ストリーム停止
+  if (state.ppStream) {
+    state.ppStream.getTracks().forEach(t => t.stop());
+    state.ppStream = null;
+  }
+
+  // プレビュー表示
+  const preview = document.getElementById('pp-preview');
+  preview.src = dataUrl;
+  preview.style.display = 'block';
+  video.style.display = 'none';
+  state.passportCaptured = true;
+  state.passportPhotoData = dataUrl;
+
+  document.getElementById('btn-pp-retake').style.display = 'flex';
+  document.getElementById('btn-pp-capture').style.display = 'none';
+}
+
+function retakePassport() {
+  state.passportCaptured = false;
+  state.passportPhotoData = null;
+  document.getElementById('pp-preview').style.display = 'none';
+  document.getElementById('pp-video').style.display = 'none';
+  document.getElementById('pp-overlay').style.display = 'flex';
+  document.getElementById('btn-pp-retake').style.display = 'none';
+  document.getElementById('btn-pp-capture').style.display = 'flex';
+  document.getElementById('btn-pp-capture').textContent = t('capture');
+  document.getElementById('btn-pp-capture').onclick = startPassportCamera;
+}
+
+// ===== VALIDATION & SUBMIT =====
+function submitGuest() {
+  if (state.isJapan === null) { showAlert(t('err_japan')); return; }
+  const name = document.getElementById('f-name').value.trim();
+  const addr = document.getElementById('f-addr').value.trim();
+  const phone = document.getElementById('f-phone').value.trim();
+  const job = document.getElementById('f-job').value.trim();
+  const gender = document.getElementById('f-gender').value;
+  const dob = document.getElementById('f-dob').value;
+
+  if (!name) { showAlert(t('err_name')); return; }
+  if (!addr) { showAlert(t('err_addr')); return; }
+  if (!phone) { showAlert(t('err_phone')); return; }
+  if (!job) { showAlert(t('err_job')); return; }
+  if (!gender) { showAlert(t('err_gender')); return; }
+  if (!dob) { showAlert(t('err_dob')); return; }
+
+  if (!state.isJapan) {
+    const nat = document.getElementById('f-nationality').value.trim();
+    const pp = document.getElementById('f-passport').value.trim();
+    if (!nat) { showAlert(t('err_nationality')); return; }
+    if (!pp) { showAlert(t('err_passport')); return; }
+    if (!state.passportCaptured) { showAlert(t('err_pp')); return; }
+  }
+
+  state.guests.push({
+    name, addr, phone, job, gender, dob,
+    isJapan: state.isJapan,
+    nationality: document.getElementById('f-nationality').value.trim(),
+    passportNo: document.getElementById('f-passport').value.trim(),
+    passportPhoto: state.passportPhotoData || null,
+  });
+  state.passportPhotoData = null;
+
+  if (state.currentGuest < state.totalGuests) {
+    state.currentGuest++;
+    loadGuestForm();
+    document.getElementById('screen-form').scrollTop = 0;
+  } else {
+    goTo('screen-photo');
+  }
+}
+
+// ===== GROUP CAMERA =====
+async function startGroupCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } },
+      audio: false
+    });
+    state.groupStream = stream;
+    const video = document.getElementById('group-video');
+    video.srcObject = stream;
+    video.style.display = 'block';
+    document.getElementById('group-overlay').style.display = 'none';
+    document.getElementById('btn-start-camera').style.display = 'none';
+    document.getElementById('btn-take-photo').style.display = 'flex';
+  } catch (e) {
+    // カメラが使えない環境（プレビュー用）
+    showMockCamera();
+  }
+}
+
+function showMockCamera() {
+  document.getElementById('group-overlay').innerHTML = `
+    <div style="background:rgba(0,0,0,0.5); padding:20px; border-radius:14px; text-align:center">
+      <div style="font-size:48px">📸</div>
+      <div style="font-size:14px; color:white; margin-top:8px">プレビューモード<br>（本番ではiPadカメラが起動します）</div>
+    </div>
+  `;
+  document.getElementById('btn-start-camera').style.display = 'none';
+  document.getElementById('btn-take-photo').style.display = 'flex';
+}
+
+function takeGroupPhoto() {
+  const video = document.getElementById('group-video');
+  const canvas = document.getElementById('group-canvas');
+
+  if (video.srcObject) {
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const preview = document.getElementById('group-preview');
+    preview.src = dataUrl;
+    preview.style.display = 'block';
+    video.style.display = 'none';
+    if (state.groupStream) {
+      state.groupStream.getTracks().forEach(t => t.stop());
+      state.groupStream = null;
+    }
+  } else {
+    // モックモード
+    const preview = document.getElementById('group-preview');
+    preview.src = 'data:image/svg+xml,' + encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" style="background:#1a1a2e">
+        <text x="320" y="200" text-anchor="middle" font-size="80">👨‍👩‍👧‍👦</text>
+        <text x="320" y="280" text-anchor="middle" font-size="20" fill="rgba(255,255,255,0.7)">Group Photo Captured</text>
+        <text x="320" y="310" text-anchor="middle" font-size="14" fill="rgba(255,255,255,0.4)">(実際にはiPadカメラで撮影)</text>
+      </svg>
+    `);
+    preview.style.display = 'block';
+    document.getElementById('group-overlay').style.display = 'none';
+  }
+
+  state.groupPhotoCaptured = true;
+  document.getElementById('btn-take-photo').style.display = 'none';
+  document.getElementById('btn-retake-photo').style.display = 'flex';
+  document.getElementById('btn-finish').style.display = 'flex';
+}
+
+function retakeGroupPhoto() {
+  state.groupPhotoCaptured = false;
+  document.getElementById('group-preview').style.display = 'none';
+  document.getElementById('btn-retake-photo').style.display = 'none';
+  document.getElementById('btn-finish').style.display = 'none';
+  document.getElementById('group-overlay').innerHTML = `
+    <div class="camera-guide">📸</div>
+    <div class="camera-guide-text" id="txt-photo-tap">${t('photoTap')}</div>
+  `;
+  document.getElementById('group-overlay').style.display = 'flex';
+  document.getElementById('btn-start-camera').style.display = 'flex';
+}
+
+// ===== FINISH =====
+async function finish() {
+  if (!state.groupPhotoCaptured) { showAlert(t('err_photo')); return; }
+  state.checkinTime = new Date();
+  await saveCheckin();
+  goTo('screen-done');
+}
+
+// ===== CHECKOUT =====
+async function doCheckout() {
+  await saveCheckout();
+  goTo('screen-checkout-done');
+
+  // チェックアウト完了から20秒後にトップへリセット
+  clearTimeout(state.resetTimer);
+  state.resetTimer = setTimeout(() => {
+    resetAll();
+  }, 20000);
+}
+
+function resetAll() {
+  clearTimeout(state.resetTimer);
+  if (state.groupStream) {
+    state.groupStream.getTracks().forEach(t => t.stop());
+    state.groupStream = null;
+  }
+  // group photo reset
+  document.getElementById('group-video').style.display = 'none';
+  document.getElementById('group-video').srcObject = null;
+  document.getElementById('group-preview').style.display = 'none';
+  document.getElementById('group-overlay').innerHTML = `
+    <div class="camera-guide">📸</div>
+    <div class="camera-guide-text">${t('photoTap')}</div>
+  `;
+  document.getElementById('group-overlay').style.display = 'flex';
+  document.getElementById('btn-start-camera').style.display = 'flex';
+  document.getElementById('btn-take-photo').style.display = 'none';
+  document.getElementById('btn-retake-photo').style.display = 'none';
+  document.getElementById('btn-finish').style.display = 'none';
+
+  state.totalGuests = 1;
+  state.guests = [];
+  state.groupPhotoCaptured = false;
+  state.checkinDocId = null;
+  state.passportPhotoData = null;
+  document.getElementById('count-display').textContent = '1';
+
+  goTo('screen-lang');
+}
+
+// ===== ALERT =====
+function showAlert(msg) {
+  // シンプルなトースト
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed; bottom:40px; left:50%; transform:translateX(-50%);
+    background:#ef4444; color:white; padding:14px 24px; border-radius:14px;
+    font-size:15px; font-weight:600; z-index:9999; max-width:90%;
+    box-shadow:0 4px 20px rgba(0,0,0,0.3); text-align:center;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ===== INIT =====
+document.getElementById('f-dob').max = new Date().toISOString().split('T')[0];
+applyLang();
+</script>
+</body>
+</html>
