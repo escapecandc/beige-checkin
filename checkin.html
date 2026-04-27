@@ -9,6 +9,8 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <!-- EmailJS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -825,6 +827,12 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// ===== EMAILJS =====
+emailjs.init('dn0aJs3_A0115xAzX');
+const EMAILJS_SERVICE  = 'service_hadr06u';
+const EMAILJS_CHECKIN  = 'template_wbborzo';
+const EMAILJS_CHECKOUT = 'template_2vm4t3i';
 
 // 画像を圧縮してbase64に変換
 function compressImage(dataUrl, maxWidth, quality) {
@@ -1651,12 +1659,33 @@ async function finish() {
   state.checkinTime = new Date();
   await saveCheckin();
   goTo('screen-done');
+
+  // チェックイン通知メール
+  try {
+    const g = state.guests[0] || {};
+    await emailjs.send(EMAILJS_SERVICE, EMAILJS_CHECKIN, {
+      room:         state.room,
+      guest_name:   g.name || '（不明）',
+      total_guests: state.totalGuests,
+      checkin_time: state.checkinTime.toLocaleString('ja-JP')
+    });
+  } catch(e) { console.warn('EmailJS checkin error:', e); }
 }
 
 // ===== CHECKOUT =====
 async function doCheckout() {
   await saveCheckout();
   goTo('screen-checkout-done');
+
+  // チェックアウト通知メール
+  try {
+    const g = state.guests[0] || {};
+    await emailjs.send(EMAILJS_SERVICE, EMAILJS_CHECKOUT, {
+      room:          state.room,
+      guest_name:    g.name || '（不明）',
+      checkout_time: new Date().toLocaleString('ja-JP')
+    });
+  } catch(e) { console.warn('EmailJS checkout error:', e); }
 
   // チェックアウト完了から20秒後にトップへリセット
   clearTimeout(state.resetTimer);
