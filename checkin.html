@@ -65,6 +65,17 @@
       flex-shrink: 0;
     }
     .header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+    .btn-back {
+      background: rgba(255,255,255,0.18);
+      border: none;
+      color: white;
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
     .header .room-badge {
       background: rgba(255,255,255,0.18);
       border-radius: 20px;
@@ -92,6 +103,8 @@
       display: flex;
       flex-direction: column;
       gap: 20px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     /* ===== TYPOGRAPHY ===== */
@@ -313,7 +326,7 @@
     .camera-view {
       position: relative;
       width: 100%;
-      aspect-ratio: 4/3;
+      aspect-ratio: 16/9;
       background: #111;
       display: flex;
       align-items: center;
@@ -534,6 +547,7 @@
   <!-- ===== SCREEN 3: 人数入力 ===== -->
   <div class="screen" id="screen-count">
     <div class="header">
+      <button class="btn-back" onclick="goTo('screen-welcome')">← 戻る</button>
       <h1 id="hdr-count">宿泊人数</h1>
       <div class="room-badge" id="room-badge-count">101号室</div>
     </div>
@@ -564,6 +578,7 @@
   <!-- ===== SCREEN 4: 宿泊者情報入力 ===== -->
   <div class="screen" id="screen-form">
     <div class="header">
+      <button class="btn-back" onclick="goBackForm()">← 戻る</button>
       <h1 id="hdr-form">宿泊者情報</h1>
       <div class="room-badge" id="room-badge-form">101号室</div>
     </div>
@@ -686,6 +701,7 @@
   <!-- ===== SCREEN 5: 集合写真 ===== -->
   <div class="screen" id="screen-photo">
     <div class="header">
+      <button class="btn-back" onclick="goBackPhoto()">← 戻る</button>
       <h1 id="hdr-photo">集合写真</h1>
       <div class="room-badge" id="room-badge-photo">101号室</div>
     </div>
@@ -1651,6 +1667,29 @@ function retakeGroupPhoto() {
   `;
   document.getElementById('group-overlay').style.display = 'flex';
   document.getElementById('btn-start-camera').style.display = 'flex';
+}
+
+// ===== BACK NAVIGATION =====
+function goBackForm() {
+  if (state.currentGuest <= 1) {
+    goTo('screen-count');
+  } else {
+    state.currentGuest--;
+    loadGuestForm();
+    document.getElementById('screen-form').scrollTop = 0;
+  }
+}
+
+function goBackPhoto() {
+  // カメラを停止してから戻る
+  if (state.groupStream) {
+    state.groupStream.getTracks().forEach(t => t.stop());
+    state.groupStream = null;
+  }
+  state.groupPhotoCaptured = false;
+  state.currentGuest = state.totalGuests;
+  loadGuestForm();
+  goTo('screen-form');
 }
 
 // ===== FINISH =====
